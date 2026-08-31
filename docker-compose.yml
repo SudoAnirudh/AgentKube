@@ -1,0 +1,89 @@
+services:
+  # 1. In-Memory Data Store & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: agent-redis
+    # Note: Port 6379 is NOT mapped to host machine; exposed internally on agent-network only
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 2s
+    networks:
+      - agent-network
+    restart: unless-stopped
+
+  # 2. FastAPI Web Server API Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "${API_PORT:-8009}:8000"
+
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      - LLM_MODEL=${LLM_MODEL:-llama-3.3-70b-versatile}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/2}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/1}
+      - CELERY_TASK_ALWAYS_EAGER=False
+      - MAX_RETRIES=${MAX_RETRIES:-2}
+      - AGENT_TIMEOUT_SECONDS=${AGENT_TIMEOUT_SECONDS:-30.0}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    networks:
+      - agent-network
+    restart: unless-stopped
+
+  # 3. Celery Background Worker Service
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-worker
+    command: celery -A app.workers.celery_app worker --loglevel=info
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      - LLM_MODEL=${LLM_MODEL:-llama-3.3-70b-versatile}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/2}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/1}
+      - CELERY_TASK_ALWAYS_EAGER=False
+      - MAX_RETRIES=${MAX_RETRIES:-2}
+      - AGENT_TIMEOUT_SECONDS=${AGENT_TIMEOUT_SECONDS:-30.0}
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-1}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.workers.celery_app", "inspect", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - agent-network
+    restart: unless-stopped
+
+networks:
+  agent-network:
+    driver: bridge

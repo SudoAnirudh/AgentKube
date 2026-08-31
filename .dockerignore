@@ -1,0 +1,34 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Environment files and secrets
+.env
+*.env
+
+# Python virtual environments & bytecode
+.venv
+venv
+env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+
+# Documentation learning notes & agent workspace state
+docs/learning/
+artifacts/
+.gemini/
+.agents/
+
+# IDE & Editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Temporary files & logs
+*.log
+tmp/
