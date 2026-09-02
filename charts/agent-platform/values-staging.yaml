@@ -1,0 +1,11 @@
+# Staging Environment Configuration Overrides
+
+api:
+  replicaCount: 2
+
+worker:
+  replicaCount: 2
+
+config:
+  environment: staging
+  logLevel: INFO

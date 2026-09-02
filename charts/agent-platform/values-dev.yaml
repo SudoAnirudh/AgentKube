@@ -1,0 +1,11 @@
+# Development Environment Configuration Overrides
+
+api:
+  replicaCount: 1
+
+worker:
+  replicaCount: 1
+
+config:
+  environment: development
+  logLevel: DEBUG

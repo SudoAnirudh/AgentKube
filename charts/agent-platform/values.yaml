@@ -1,0 +1,77 @@
+# Default values for agent-platform Helm Chart
+
+namespace: agent-platform
+
+api:
+  replicaCount: 2
+  image:
+    repository: ai_infra-kuber-app
+    tag: v1.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    readiness:
+      path: /ready
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+worker:
+  replicaCount: 1
+  image:
+    repository: ai_infra-kuber-app
+    tag: v1.1.0
+    pullPolicy: IfNotPresent
+  command:
+    - celery
+    - -A
+    - app.workers.celery_app
+    - worker
+    - --loglevel=info
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+redis:
+  replicaCount: 1
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 6379
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+config:
+  redisUrl: redis://agent-redis:6379/2
+  celeryBrokerUrl: redis://agent-redis:6379/0
+  celeryResultBackend: redis://agent-redis:6379/1
+  environment: kubernetes
+  logLevel: INFO
+  port: 8000
+
+secrets:
+  llmApiKey: "" # Supplied via --set-string secrets.llmApiKey="..." or external secret file
