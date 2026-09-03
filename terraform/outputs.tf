@@ -18,6 +18,11 @@ output "oidc_provider_arn" {
   value       = aws_iam_openid_connect_provider.eks.arn
 }
 
+output "github_actions_role_arn" {
+  description = "ARN of the IAM Role for GitHub Actions OIDC Authentication"
+  value       = aws_iam_role.github_actions.arn
+}
+
 output "kubeconfig_command" {
   description = "CLI command to update local kubeconfig for the EKS Cluster"
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${aws_eks_cluster.main.name}"
