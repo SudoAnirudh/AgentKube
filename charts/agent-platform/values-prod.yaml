@@ -23,3 +23,18 @@ worker:
 config:
   environment: production
   logLevel: WARNING
+
+ingress:
+  enabled: true
+  className: nginx
+  host: api.agentkube.example.com
+  tls:
+    enabled: true
+    secretName: agentkube-tls-secret
+
+externalSecrets:
+  enabled: true
+  secretStoreName: aws-secrets-manager
+  remoteKey: agentkube/prod/llm_api_key
+  remoteProperty: LLM_API_KEY
+  refreshInterval: 1h

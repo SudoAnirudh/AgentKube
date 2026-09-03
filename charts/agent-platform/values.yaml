@@ -73,5 +73,21 @@ config:
   logLevel: INFO
   port: 8000
 
+ingress:
+  enabled: false
+  className: nginx
+  host: api.agentkube.example.com
+  annotations: {}
+  tls:
+    enabled: true
+    secretName: agentkube-tls-secret
+
+externalSecrets:
+  enabled: false
+  secretStoreName: aws-secrets-manager
+  remoteKey: agentkube/prod/llm_api_key
+  remoteProperty: LLM_API_KEY
+  refreshInterval: 1h
+
 secrets:
-  llmApiKey: "" # Supplied via --set-string secrets.llmApiKey="..." or external secret file
+  llmApiKey: "" # Supplied via --set-string secrets.llmApiKey="..." when ExternalSecret is disabled

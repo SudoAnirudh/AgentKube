@@ -1,159 +1,159 @@
-# Kubernetes Multi-Agent AI Execution Platform (Phase 5)
+# Kubernetes Multi-Agent AI Execution Platform (Phase 6)
 
-Asynchronous job-based multi-agent execution platform containerized with **Docker**, orchestrated using **Kubernetes** (`kind` / `kubectl`), and packaged with **Helm** (v3.17+). Demonstrates declarative Kubernetes patterns and Helm package management: **Charts, Templating, Values Hierarchy (Dev, Staging, Prod), Release Lifecycle (Lint, Template, Install, Upgrade, Rollback), Probes, and Resource Management**.
+Asynchronous job-based multi-agent execution platform containerized with **Docker**, orchestrated using **Kubernetes** (`kind` / `kubectl`), packaged with **Helm** (v3.17+), and provisioned with **Terraform IaC** for Cloud Kubernetes (AWS EKS). Demonstrates production cloud architecture: **Infrastructure as Code (Terraform), Cloud Subnet Routing (Public/Private NAT), External Secrets Operator (ESO), NGINX Ingress Controller with TLS Termination, Health Probes, and Values Hierarchy (Dev, Staging, Prod)**.
 
 ---
 
-## 1. Architecture & Helm Target Structure
+## 1. Architecture & Production Cloud Structure
 
 ```text
-                                  Helm Chart (charts/agent-platform)
-                                                  │
-                         ┌────────────────────────┴────────────────────────┐
-                         │                                                 │
-                     Templates                                          Values
-        (charts/agent-platform/templates/)                   (values-dev.yaml, values-prod.yaml)
-                         │                                                 │
-                         └────────────────────────┬────────────────────────┘
-                                                  ↓
-                                        Kubernetes Manifests
-                                                  ↓
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ Kubernetes Cluster (kind: agent-cluster)                                               │
-│ Namespace: agent-platform                                                              │
-│                                                                                        │
-│   ┌────────────────────────────────────────────────────────────────────────────────┐   │
-│   │ agent-api Service (ClusterIP: 8000)                                            │   │
-│   └──────────────────────┬──────────────────────────────────┬──────────────────────┘   │
-│                          │                                  │                          │
-│                          ▼                                  ▼                          │
-│           ┌─────────────────────────────┐    ┌─────────────────────────────┐           │
-│           │      agent-api Pod 1        │    │      agent-api Pod 2        │           │
-│           │ (Image: app:v1.1.0 uvicorn) │    │ (Image: app:v1.1.0 uvicorn) │           │
-│           └──────────────┬──────────────┘    └──────────────┬──────────────┘           │
-│                          │                                  │                          │
-│                          │ redis://agent-redis:6379/2       │                          │
-│                          ▼                                  ▼                          │
-│   ┌────────────────────────────────────────────────────────────────────────────────┐   │
-│   │ agent-redis Service (ClusterIP: 6379)                                          │   │
-│   └──────────────────────────────────────┬─────────────────────────────────────────┘   │
-│                                          │                                             │
-│                                          ▼                                             │
-│                           ┌─────────────────────────────┐                              │
-│                           │       agent-redis Pod       │                              │
-│                           │       (Redis 7 Alpine)      │                              │
-│                           └──────────────▲──────────────┘                              │
-│                                          │                                             │
-│                                          │ redis://agent-redis:6379/0 (Broker)         │
-│                                          │ redis://agent-redis:6379/2 (State)          │
-│                                          │                                             │
-│                                          ▼                                             │
-│                           ┌─────────────────────────────┐                              │
-│                           │      agent-worker Pod       │                              │
-│                           │  (Image: app:v1.1.0 celery) │                              │
-│                           └─────────────────────────────┘                              │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+                                  Public Internet
+                                         │
+                                       HTTPS
+                                         ▼
+                               ┌──────────────────┐
+                               │ Cloud ELB / ALB  │
+                               └────────┬─────────┘
+                                        │
+                                        ▼
+                               ┌──────────────────┐
+                               │  NGINX Ingress   │
+                               │  (TLS Terminated)│
+                               └────────┬─────────┘
+                                        │ HTTP
+                                        ▼
+ ┌────────────────────────────────────────────────────────────────────────────────────────┐
+ │ AWS EKS Cluster (agentkube-cluster)                                                    │
+ │ Namespace: agent-platform                                                              │
+ │                                                                                        │
+ │   ┌────────────────────────────────────────────────────────────────────────────────┐   │
+ │   │ agent-api Service (ClusterIP: 8000)                                            │   │
+ │   └──────────────────────┬──────────────────────────────────┬──────────────────────┘   │
+ │                          │                                  │                          │
+ │                          ▼                                  ▼                          │
+ │           ┌─────────────────────────────┐    ┌─────────────────────────────┐           │
+ │           │      agent-api Pod 1        │    │      agent-api Pod 2        │           │
+ │           │ (Image: app:v1.1.0 uvicorn) │    │ (Image: app:v1.1.0 uvicorn) │           │
+ │           └──────────────┬──────────────┘    └──────────────┬──────────────┘           │
+ │                          │                                  │                          │
+ │                          │ redis://agent-redis:6379/2       │                          │
+ │                          ▼                                  ▼                          │
+ │   ┌────────────────────────────────────────────────────────────────────────────────┐   │
+ │   │ agent-redis Service (ClusterIP: 6379)                                          │   │
+ │   └──────────────────────────────────────┬─────────────────────────────────────────┘   │
+ │                                          │                                             │
+ │                                          ▼                                             │
+ │                           ┌─────────────────────────────┐                              │
+ │                           │       agent-redis Pod       │                              │
+ │                           │       (Redis 7 Alpine)      │                              │
+ │                           └──────────────▲──────────────┘                              │
+ │                                          │                                             │
+ │                                          │ redis://agent-redis:6379/0 (Broker)         │
+ │                                          │ redis://agent-redis:6379/2 (State)          │
+ │                                          │                                             │
+ │                                          ▼                                             │
+ │                           ┌─────────────────────────────┐                              │
+ │                           │      agent-worker Pod       │                              │
+ │                           │  (Image: app:v1.1.0 celery) │                              │
+ │                           └─────────────────────────────┘                              │
+ └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Helm Chart Package Structure
+## 2. Helm & Terraform Project Structure
 
 ```text
-charts/
-└── agent-platform/
-    ├── Chart.yaml              # Chart metadata (version: 0.1.0, appVersion: 1.1.0)
-    ├── values.yaml             # Default base configuration
-    ├── values-dev.yaml         # Development overrides (api: 1, worker: 1, DEBUG)
-    ├── values-staging.yaml     # Staging overrides (api: 2, worker: 2, INFO)
-    ├── values-prod.yaml        # Production overrides (api: 3, worker: 2, WARNING)
-    └── templates/
-        ├── configmap.yaml      # Parameterized ConfigMap
-        ├── secret.yaml         # Parameterized Secret (Base64 encoding)
-        ├── redis-deployment.yaml# Redis 7 Alpine Deployment
-        ├── redis-service.yaml   # Redis ClusterIP Service
-        ├── api-deployment.yaml  # FastAPI Deployment with probes
-        ├── api-service.yaml    # API ClusterIP Service
-        └── worker-deployment.yaml # Celery worker Deployment
+.
+├── terraform/                  # Infrastructure as Code (AWS EKS)
+│   ├── versions.tf             # Terraform & AWS/K8s/Helm provider versions
+│   ├── providers.tf            # AWS, K8s, Helm provider definitions
+│   ├── variables.tf            # Region, environment, EKS cluster inputs
+│   ├── networking.tf           # VPC (10.0.0.0/16), subnets, IGW, NAT GW
+│   ├── main.tf                 # EKS Cluster, node groups, IAM OIDC provider
+│   ├── outputs.tf              # EKS endpoint, SG ID, OIDC ARN, kubeconfig
+│   ├── kubernetes.tf           # Namespace agent-platform & IRSA ServiceAccount
+│   └── README.md               # Terraform deployment & state management guide
+├── charts/
+│   └── agent-platform/
+│       ├── Chart.yaml          # Chart metadata (version: 0.1.0, appVersion: 1.1.0)
+│       ├── values.yaml         # Base default values (Ingress/Secrets disabled for local dev)
+│       ├── values-dev.yaml     # Dev overrides (api: 1, worker: 1)
+│       ├── values-staging.yaml # Staging overrides (api: 2, worker: 2)
+│       ├── values-prod.yaml    # Production overrides (api: 3, worker: 2, Ingress & ExternalSecrets enabled)
+│       └── templates/
+│           ├── configmap.yaml      # Parameterized ConfigMap
+│           ├── secret.yaml         # Local Secret (Base64 encoding)
+│           ├── external-secret.yaml# ExternalSecret (AWS Secrets Manager integration)
+│           ├── ingress.yaml        # NGINX Ingress template with TLS
+│           ├── redis-deployment.yaml# Redis 7 Alpine Deployment
+│           ├── redis-service.yaml   # Redis ClusterIP Service
+│           ├── api-deployment.yaml  # FastAPI Deployment with probes
+│           ├── api-service.yaml    # API ClusterIP Service
+│           └── worker-deployment.yaml # Celery worker Deployment
+└── docs/learning/
+    └── task-06-cloud-kubernetes-infrastructure.md # Task 06 Learning Document
 ```
 
 ---
 
-## 3. Quickstart & Helm Lifecycle Operations
+## 3. Quickstart: Terraform & Helm Operations
 
 ### Prerequisites
 - Docker Engine (v20.10+)
 - `kind` (v0.27.0+)
-- `kubectl` (v1.30+)
-- `helm` (v3.17+)
+- `kubectl` (v1.37.0+)
+- `helm` (v3.17.1+)
+- `terraform` (v1.9.8+)
 
-### Step 1: Lint Chart
+### Step 1: Validate Terraform IaC
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+cd terraform
+terraform fmt -check
+terraform validate
+```
+
+### Step 2: Provision Cloud EKS Cluster (AWS)
+```bash
+cd terraform
+terraform init
+terraform plan -out=tfplan
+terraform apply tfplan
+
+# Configure kubectl context for EKS
+aws eks update-kubeconfig --region us-east-1 --name agentkube-cluster
+```
+
+### Step 3: Lint & Render Production Helm Manifests
 ```bash
 helm lint ./charts/agent-platform
+
+# Render production manifests with Ingress and ExternalSecrets
+helm template agent-platform ./charts/agent-platform -f charts/agent-platform/values-prod.yaml
 ```
 
-### Step 2: Render Templates (Local Dry-Run)
+### Step 4: Deploy Production Release
 ```bash
-helm template agent-platform ./charts/agent-platform -f charts/agent-platform/values-dev.yaml
-```
-
-### Step 3: Install Release (Development Environment)
-```bash
-helm install agent-platform ./charts/agent-platform \
-  -f charts/agent-platform/values-dev.yaml \
+helm upgrade --install agent-platform ./charts/agent-platform \
+  -f charts/agent-platform/values-prod.yaml \
   -n agent-platform \
-  --create-namespace \
-  --set-string secrets.llmApiKey="$LLM_API_KEY"
-```
-
-### Step 4: Verify Deployment & Health Probes
-```bash
-kubectl get pods,svc,deploy -n agent-platform
-
-# Port-forward API service
-kubectl port-forward svc/agent-api 8009:8000 -n agent-platform &
-
-# Test probes
-curl http://localhost:8009/health # {"status":"healthy"}
-curl http://localhost:8009/ready  # {"status":"ready"}
-```
-
-### Step 5: Upgrade Release (Staging Environment)
-```bash
-helm upgrade agent-platform ./charts/agent-platform \
-  -f charts/agent-platform/values-staging.yaml \
-  -n agent-platform
-```
-
-### Step 6: View Release History
-```bash
-helm history agent-platform -n agent-platform
-```
-
-### Step 7: Rollback Release
-```bash
-helm rollback agent-platform 1 -n agent-platform
-```
-
-### Step 8: Uninstall Release
-```bash
-helm uninstall agent-platform -n agent-platform
+  --create-namespace
 ```
 
 ---
 
-## 4. Helm & Kubernetes Operations Guide
+## 4. Helm & Infrastructure Operations Summary
 
 | Action | Command |
 | --- | --- |
-| **Lint Chart** | `helm lint ./charts/agent-platform` |
-| **Render Dev YAML** | `helm template agent-platform ./charts/agent-platform -f charts/agent-platform/values-dev.yaml` |
-| **Render Prod YAML** | `helm template agent-platform ./charts/agent-platform -f charts/agent-platform/values-prod.yaml` |
-| **Install Dev** | `helm install agent-platform ./charts/agent-platform -f charts/agent-platform/values-dev.yaml -n agent-platform --create-namespace` |
-| **Upgrade Staging** | `helm upgrade agent-platform ./charts/agent-platform -f charts/agent-platform/values-staging.yaml -n agent-platform` |
-| **View Release History** | `helm history agent-platform -n agent-platform` |
-| **Rollback to Revision 1** | `helm rollback agent-platform 1 -n agent-platform` |
-| **Uninstall Release** | `helm uninstall agent-platform -n agent-platform` |
+| **Validate Terraform** | `cd terraform && terraform fmt -check && terraform validate` |
+| **Lint Helm Chart** | `helm lint ./charts/agent-platform` |
+| **Render Dev Manifests** | `helm template agent-platform ./charts/agent-platform -f charts/agent-platform/values-dev.yaml` |
+| **Render Prod Manifests** | `helm template agent-platform ./charts/agent-platform -f charts/agent-platform/values-prod.yaml` |
+| **Install Local Dev Release** | `helm install agent-platform ./charts/agent-platform -f charts/agent-platform/values-dev.yaml -n agent-platform --create-namespace` |
+| **Install Prod Release** | `helm upgrade --install agent-platform ./charts/agent-platform -f charts/agent-platform/values-prod.yaml -n agent-platform --create-namespace` |
+| **Rollback Release** | `helm rollback agent-platform 1 -n agent-platform` |
 
 ---
 
@@ -191,5 +191,6 @@ Response: `202 Accepted {"execution_id": "exec_3523704bfe38", "status": "queued"
 
 ## 7. Roadmap & Next Phase
 
-- **Phase 6**: Managed Cloud Kubernetes Deployment (AWS EKS / Azure AKS with Terraform, Cloud LoadBalancers, and External Secrets Manager).
-- **Phase 7**: Observability & Autoscaling (Prometheus, Grafana, and Horizontal Pod Autoscalers).
+- **Phase 6 (Completed)**: Cloud Kubernetes Infrastructure & Production Hardening (AWS EKS Terraform IaC, External Secrets Operator, NGINX Ingress & TLS).
+- **Phase 7 (Next)**: Observability & Autoscaling (Prometheus, Grafana, and Horizontal Pod Autoscalers).
+
