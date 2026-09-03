@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: agentkube
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: AgentKube AI Agent Execution Platform Project
+  sourceRepos:
+    - 'https://github.com/SudoAnirudh/AgentKube.git'
+    - 'git@github.com:SudoAnirudh/AgentKube.git'
+  destinations:
+    - namespace: 'agent-platform'
+      server: 'https://kubernetes.default.svc'
+    - namespace: 'agent-platform-dev'
+      server: 'https://kubernetes.default.svc'
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
