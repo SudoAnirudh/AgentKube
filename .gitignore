@@ -10,6 +10,7 @@ ENV/
 .coverage
 htmlcov/
 *.log
+*.egg-info/
 
 # Local development learning documentation
 docs/learning/
