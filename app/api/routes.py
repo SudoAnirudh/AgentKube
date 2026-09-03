@@ -12,7 +12,9 @@ from app.models.responses import (
 from app.storage.redis import RedisStateManager
 from app.utils.config import Settings, get_settings
 from app.utils.logger import get_logger, log_execution_event
+from app.utils.metrics import AGENT_TASKS_TOTAL
 from app.workers.tasks import run_agent_execution
+
 
 logger = get_logger()
 router = APIRouter()
@@ -66,6 +68,7 @@ async def submit_agent_task(
 
     # 1. Create state in Redis with status = QUEUED
     state = state_mgr.create_state(task=request.task, context=request.context)
+    AGENT_TASKS_TOTAL.labels(status="queued").inc()
 
     log_execution_event(
         "INFO",
@@ -73,6 +76,7 @@ async def submit_agent_task(
         execution_id=state.execution_id,
         status=state.status.value,
     )
+
 
     # 2. Enqueue Celery background task
     run_agent_execution.delay(state.execution_id)

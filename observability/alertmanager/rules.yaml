@@ -1,0 +1,65 @@
+groups:
+  - name: agentkube_alerts
+    rules:
+      - alert: ApiReplicasUnavailable
+        expr: kube_deployment_status_replicas_available{deployment="agent-api", namespace="agent-platform"} < kube_deployment_spec_replicas{deployment="agent-api", namespace="agent-platform"}
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AgentKube API available replicas below target"
+          description: "Available agent-api replicas ({{ $value }}) is less than the desired spec count."
+
+      - alert: HighApiErrorRate
+        expr: sum(rate(agent_http_requests_total{status=~"5.."}[5m])) / sum(rate(agent_http_requests_total[5m])) * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API HTTP 5xx error rate"
+          description: "HTTP 5xx error rate is currently {{ $value }}% (threshold > 5%)."
+
+      - alert: HighApiLatency
+        expr: histogram_quantile(0.95, sum(rate(agent_http_request_duration_seconds_bucket[5m])) by (le)) > 2.0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 95th percentile API latency"
+          description: "API p95 latency is {{ $value }} seconds (threshold > 2.0s)."
+
+      - alert: WorkerUnavailable
+        expr: kube_deployment_status_replicas_available{deployment="agent-worker", namespace="agent-platform"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "All Celery worker replicas are unavailable"
+          description: "No agent-worker pod is available to process queued tasks."
+
+      - alert: HighTaskFailureRate
+        expr: sum(rate(agent_tasks_total{status="failed"}[5m])) / sum(rate(agent_tasks_total[5m])) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent task failure rate exceeds threshold"
+          description: "Agent task failure rate is currently {{ $value }}% (threshold > 10%)."
+
+      - alert: RedisUnavailable
+        expr: redis_up{namespace="agent-platform"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis storage/broker instance is unreachable"
+          description: "Redis instance in namespace agent-platform cannot be reached."
+
+      - alert: PodRestartSpike
+        expr: increase(kube_pod_container_status_restarts_total{namespace="agent-platform"}[15m]) > 3
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod container restarts spiking"
+          description: "Pod in namespace agent-platform restarted {{ $value }} times in the last 15 minutes."

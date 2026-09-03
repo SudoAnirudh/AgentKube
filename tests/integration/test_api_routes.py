@@ -17,6 +17,14 @@ async def test_readiness_endpoint(async_client):
     assert data == {"status": "ready"}
 
 
+@pytest.mark.asyncio
+async def test_prometheus_metrics_endpoint(async_client):
+    response = await async_client.get("/metrics")
+    assert response.status_code == 200
+    content = response.text
+    assert "agent_http_requests_total" in content
+    assert "agent_tasks_total" in content
+
 
 @pytest.mark.asyncio
 async def test_submit_agent_task_returns_202(async_client):

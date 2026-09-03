@@ -1,0 +1,53 @@
+{
+  "title": "AgentKube — Platform Overview",
+  "tags": ["agentkube", "overview"],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "API Available Replicas",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "kube_deployment_status_replicas_available{deployment=\"agent-api\", namespace=\"agent-platform\"}",
+          "legendFormat": "API Replicas"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Worker Available Replicas",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "kube_deployment_status_replicas_available{deployment=\"agent-worker\", namespace=\"agent-platform\"}",
+          "legendFormat": "Worker Replicas"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Active Executions",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "agent_active_tasks",
+          "legendFormat": "Active Tasks"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "HTTP Request Throughput (req/sec)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(agent_http_requests_total[1m])) by (status)",
+          "legendFormat": "Status {{status}}"
+        }
+      ]
+    }
+  ]
+}

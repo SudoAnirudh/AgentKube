@@ -4,6 +4,7 @@ from app.api.routes import router
 from app.models.execution import ErrorCategory, ExecutionError
 from app.models.responses import AgentRunResponseFailure
 from app.utils.logger import get_logger, setup_logging
+from app.utils.metrics import get_metrics_response, prometheus_metrics_middleware
 
 setup_logging()
 logger = get_logger()
@@ -14,7 +15,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Register Prometheus HTTP Middleware
+app.middleware("http")(prometheus_metrics_middleware)
+
 app.include_router(router)
+
+
+@app.get("/metrics", tags=["Observability"])
+async def metrics_endpoint():
+    """Prometheus metrics scraping endpoint."""
+    return get_metrics_response()
 
 
 @app.exception_handler(Exception)

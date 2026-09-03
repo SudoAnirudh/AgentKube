@@ -1,71 +1,42 @@
-# Kubernetes Multi-Agent AI Execution Platform (Phase 7)
+# Kubernetes Multi-Agent AI Execution Platform (Phase 8)
 
-Asynchronous job-based multi-agent execution platform containerized with **Docker**, orchestrated using **Kubernetes** (`kind` / `kubectl`), packaged with **Helm** (v3.17+), provisioned with **Terraform IaC** for Cloud Kubernetes (AWS EKS), and automated with **GitHub Actions CI/CD** and **Argo CD GitOps**. Demonstrates production cloud delivery: **Automated Testing, Docker Build & Trivy Vulnerability Scanning, Amazon ECR Registry Publishing, AWS OIDC Passwordless Authentication, and Argo CD GitOps Continuous Reconciliation**.
+Asynchronous job-based multi-agent execution platform containerized with **Docker**, orchestrated using **Kubernetes** (`kind` / `kubectl`), packaged with **Helm** (v3.17+), provisioned with **Terraform IaC** for Cloud Kubernetes (AWS EKS), automated with **GitHub Actions CI/CD** and **Argo CD GitOps**, and monitored with **Prometheus, Grafana, Alertmanager & Structured Telemetry**. Demonstrates production observability: **Application & HTTP Metrics (`GET /metrics`), JSON Structured Logging with `execution_id` Correlation IDs, Prometheus Scraping, Alertmanager PromQL Threshold Rules, Grafana Operational Dashboards, and K8s State Monitoring**.
 
 ---
 
-## 1. Automated CI/CD & GitOps Delivery Architecture
+## 1. Full Production Telemetry & Observability Architecture
 
 ```text
-                       Developer
-                           │
-                           │ git push
-                           ▼
-                    ┌─────────────┐
-                    │   GitHub    │
-                    └──────┬──────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ GitHub Actions  │
-                  │                 │
-                  │ Tests (Pytest)  │
-                  │ Lint (Helm)     │
-                  │ Helm Validate   │
-                  │ Docker Build    │
-                  │ Security Scan   │
-                  └────────┬────────┘
-                           │
-                           ▼
-                     ┌──────────┐
-                     │   ECR    │
-                     │ Image    │
-                     └────┬─────┘
-                          │
-                          ▼
-                 Deployment Config
-                      in Git
-                          │
-                          ▼
-                     ┌─────────┐
-                     │ Argo CD │
-                     └────┬────┘
-                          │
-                     GitOps Sync
-                          │
-                          ▼
-                 ┌──────────────────┐
-                 │      AWS EKS     │
-                 │                  │
-                 │  NGINX Ingress   │
-                 │        │         │
-                 │   agent-api      │
-                 │        │         │
-                 │   Celery Worker  │
-                 │        │         │
-                 │      Redis       │
-                 └──────────────────┘
-                          │
-                          ▼
-                 External Secrets
-                          │
-                          ▼
-                  AWS Secrets Manager
+                         Developer / CI/CD
+                                 │
+                                 ▼
+                       AWS EKS (agent-platform)
+                                 │
+        ┌────────────────────────┼────────────────────────┐
+        │                        │                        │
+        ▼                        ▼                        ▼
+    agent-api               Celery Worker             agent-redis
+ (HTTP Metrics)            (Task Metrics)           (Broker/State)
+        │                        │                        │
+        └────────────────────────┼────────────────────────┘
+                                 │
+                        Prometheus Scraper
+                          (GET /metrics)
+                                 │
+               ┌─────────────────┴─────────────────┐
+               ▼                                   ▼
+      Grafana Dashboards                  Alertmanager Rules
+ ┌───────────────────────────┐           ┌───────────────────────────┐
+ │ 1. Platform Overview      │           │ 1. WorkerUnavailable      │
+ │ 2. API Performance        │           │ 2. ApiReplicasUnavailable │
+ │ 3. Agent Execution        │           │ 3. HighTaskFailureRate    │
+ │ 4. K8s Infrastructure     │           │ 4. RedisUnavailable       │
+ └───────────────────────────┘           └───────────────────────────┘
 ```
 
 ---
 
-## 2. Helm, Terraform & GitOps Project Structure
+## 2. Helm, Terraform, GitOps & Observability Project Structure
 
 ```text
 .
@@ -76,92 +47,77 @@ Asynchronous job-based multi-agent execution platform containerized with **Docke
 ├── argocd/
 │   ├── project.yaml            # Argo CD AppProject definition
 │   ├── application-dev.yaml    # Argo CD Application (Dev environment sync)
-│   └── application-prod.yaml   # Argo CD Application (Prod environment sync)
+│   ├── application-prod.yaml   # Argo CD Application (Prod environment sync)
+│   └── application-observability.yaml # Argo CD Application (Monitoring stack sync)
+├── observability/
+│   ├── prometheus/
+│   │   └── prometheus.yaml     # Prometheus scrape configuration
+│   ├── alertmanager/
+│   │   └── rules.yaml          # Alertmanager alert rules (PromQL)
+│   └── dashboards/
+│       ├── platform-overview.json  # Grafana Platform Overview dashboard
+│       ├── api-performance.json    # Grafana API Performance dashboard
+│       ├── agent-execution.json    # Grafana Agent Execution dashboard
+│       └── k8s-infrastructure.json # Grafana K8s Infrastructure dashboard
 ├── terraform/                  # Infrastructure as Code (AWS EKS)
-│   ├── versions.tf             # Terraform & AWS/K8s/Helm provider versions
-│   ├── providers.tf            # AWS, K8s, Helm provider definitions
-│   ├── variables.tf            # Region, environment, EKS cluster inputs
-│   ├── networking.tf           # VPC (10.0.0.0/16), subnets, IGW, NAT GW
-│   ├── main.tf                 # EKS Cluster, node groups, IAM OIDC provider
-│   ├── outputs.tf              # EKS endpoint, SG ID, OIDC ARN, kubeconfig
-│   ├── kubernetes.tf           # Namespace agent-platform & IRSA ServiceAccount
-│   └── README.md               # Terraform deployment & state management guide
 ├── charts/
-│   └── agent-platform/
-│       ├── Chart.yaml          # Chart metadata (version: 0.1.0, appVersion: 1.1.0)
-│       ├── values.yaml         # Base default values
-│       ├── values-dev.yaml     # Dev overrides (api: 1, worker: 1)
-│       ├── values-staging.yaml # Staging overrides (api: 2, worker: 2)
-│       ├── values-prod.yaml    # Production overrides (api: 3, worker: 2, Ingress & ExternalSecrets enabled)
-│       └── templates/
-│           ├── configmap.yaml      # Parameterized ConfigMap
-│           ├── secret.yaml         # Local Secret (Base64 encoding)
-│           ├── external-secret.yaml# ExternalSecret (AWS Secrets Manager integration)
-│           ├── ingress.yaml        # NGINX Ingress template with TLS
-│           ├── redis-deployment.yaml# Redis 7 Alpine Deployment
-│           ├── redis-service.yaml   # Redis ClusterIP Service
-│           ├── api-deployment.yaml  # FastAPI Deployment with probes
-│           ├── api-service.yaml    # API ClusterIP Service
-│           └── worker-deployment.yaml # Celery worker Deployment
+│   └── agent-platform/        # Parameterized Helm Chart
 └── docs/learning/
     ├── task-06-cloud-kubernetes-infrastructure.md # Task 06 Learning Document
-    └── task-07-cicd-gitops-agent-delivery.md      # Task 07 Learning Document
+    ├── task-07-cicd-gitops-agent-delivery.md      # Task 07 Learning Document
+    └── task-08-observability-monitoring.md        # Task 08 Learning Document
 ```
 
 ---
 
-## 3. Quickstart: CI/CD & Argo CD Operations
+## 3. Quickstart: Metrics, Dashboards & Alerting
 
 ### Prerequisites
 - Docker Engine (v20.10+)
 - `kind` (v0.27.0+)
 - `kubectl` (v1.37.0+)
 - `helm` (v3.17.1+)
-- `terraform` (v1.9.8+)
 
-### Step 1: Run Local CI Validation Suite
+### Step 1: Run Pytest Test Suite (28 Passed)
 ```bash
-# Run Python Pytest test suite (27 passed)
 ./.venv/bin/pytest -v
-
-# Run Helm Lint & Production Dry-Run Template
-export PATH="$HOME/.local/bin:$PATH"
-helm lint ./charts/agent-platform
-helm template agent-platform ./charts/agent-platform -f charts/agent-platform/values-prod.yaml
 ```
 
-### Step 2: Build & Scan Docker Image
+### Step 2: Test Local Prometheus Metrics Endpoint
 ```bash
-docker build -t agent-platform:${{ github.sha }} .
+curl -s http://localhost:8000/metrics | grep agent_
 ```
 
-### Step 3: Deploy Argo CD Applications (GitOps)
+### Step 3: Simulate Worker Outage & Alertmanager Firing
 ```bash
-# Apply Argo CD AppProject and Applications
-kubectl apply -f argocd/project.yaml
-kubectl apply -f argocd/application-dev.yaml
-kubectl apply -f argocd/application-prod.yaml
+# 1. Scale Celery worker to 0 replicas
+kubectl scale deploy/agent-worker --replicas=0 -n agent-platform
 
-# Verify Argo CD Application Status
-kubectl get applications -n argocd
+# 2. Submit agent task to queue
+curl -X POST http://localhost:8000/api/v1/agent/run -H "Content-Type: application/json" -d '{"task":"test"}'
+
+# 3. Observe Prometheus & Alertmanager firing WorkerUnavailable alert!
+
+# 4. Restore Celery worker to 2 replicas
+kubectl scale deploy/agent-worker --replicas=2 -n agent-platform
 ```
 
 ---
 
-## 4. Operations & CI/CD Command Summary
+## 4. Operational Telemetry Command Summary
 
 | Action | Command |
 | --- | --- |
+| **Scrape Prometheus Metrics** | `curl -s http://localhost:8000/metrics` |
 | **Run Pytest Suite** | `./.venv/bin/pytest` |
 | **Lint Helm Chart** | `helm lint ./charts/agent-platform` |
-| **Validate Terraform IaC** | `cd terraform && terraform fmt -check && terraform validate` |
-| **Render Prod Manifests** | `helm template agent-platform ./charts/agent-platform -f charts/agent-platform/values-prod.yaml` |
-| **Apply Argo CD Manifests** | `kubectl apply -f argocd/` |
-| **Check Argo CD Applications** | `kubectl get applications -n argocd` |
+| **Apply Observability GitOps Manifests** | `kubectl apply -f argocd/application-observability.yaml` |
+| **Simulate Worker Outage** | `kubectl scale deploy/agent-worker --replicas=0 -n agent-platform` |
+| **Restore Worker** | `kubectl scale deploy/agent-worker --replicas=2 -n agent-platform` |
 
 ---
 
-## 5. API Contract
+## 5. API & Telemetry Contract
 
 ### Liveness Probe
 `GET /health` -> `{"status": "healthy"}`
@@ -169,25 +125,18 @@ kubectl get applications -n argocd
 ### Readiness Probe
 `GET /ready` -> `{"status": "ready"}`
 
-### Submit Job (Asynchronous)
-`POST /api/v1/agent/run`
-```json
-{
-  "task": "Analyze job description and extract required skills.",
-  "context": {}
-}
-```
-Response: `202 Accepted {"execution_id": "exec_3523704bfe38", "status": "queued"}`
+### Prometheus Metrics Endpoint
+`GET /metrics` -> Raw Prometheus formatted TSDB telemetry (`agent_http_requests_total`, `agent_tasks_total`, `agent_active_tasks`, `agent_task_duration_seconds`).
 
-### Poll Job Status
-`GET /api/v1/agent/run/{execution_id}` -> `200 OK {"status": "completed", ...}`
+### Submit Job (Asynchronous)
+`POST /api/v1/agent/run` -> `202 Accepted {"execution_id": "exec_3523704bfe38", "status": "queued"}`
 
 ---
 
 ## 6. Running Automated Tests
 
 ```bash
-# Run 27/27 Pytest test suite
+# Run 28/28 Pytest test suite
 ./.venv/bin/pytest -v
 ```
 
@@ -195,5 +144,5 @@ Response: `202 Accepted {"execution_id": "exec_3523704bfe38", "status": "queued"
 
 ## 7. Roadmap & Next Phase
 
-- **Phase 7 (Completed)**: CI/CD & GitOps Agent Delivery (GitHub Actions Workflows, AWS OIDC, ECR Push, Trivy Scanning, Argo CD GitOps).
-- **Phase 8 (Next)**: Observability, Monitoring & Production Telemetry (Prometheus, Grafana, and Horizontal Pod Autoscalers).
+- **Phase 8 (Completed)**: Observability, Monitoring & Production Telemetry (Prometheus Metrics, JSON Structured Logging, Grafana Dashboards, Alertmanager Rules).
+- **Phase 9 (Next)**: Autoscaling, Performance Optimization & Production Reliability (Horizontal Pod Autoscalers, Load Testing, SLA/SLO Enforcement).
