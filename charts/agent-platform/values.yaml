@@ -121,6 +121,24 @@ redis:
       drop:
         - ALL
 
+ui:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ai_infra-kuber-ui
+    tag: v1.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
 networkPolicy:
   enabled: true
   allowExternalIngress: true

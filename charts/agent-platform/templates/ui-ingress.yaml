@@ -1,0 +1,40 @@
+{{- if and .Values.ingress.enabled .Values.ui.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agent-ui-ingress
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: agent-platform
+    app.kubernetes.io/component: ui
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.ingress.className }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agent-ui
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: agent-api
+                port:
+                  number: 8000
+{{- end }}

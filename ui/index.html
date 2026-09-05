@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentKube — AI Agent Execution Platform</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Header / Navigation Bar -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="logo-icon">⚡</div>
+        <div class="brand-text">
+          <h1>AgentKube</h1>
+          <span class="version-tag">v1.1.0 · Hardened K8s</span>
+        </div>
+      </div>
+      
+      <nav class="nav-links">
+        <button class="nav-btn active" data-view="dashboard">
+          <span class="icon">📊</span> Dashboard
+        </button>
+        <button class="nav-btn" data-view="run-agent">
+          <span class="icon">🚀</span> Run Agent
+        </button>
+        <button class="nav-btn" data-view="executions">
+          <span class="icon">📋</span> Executions
+        </button>
+        <button class="nav-btn" data-view="health">
+          <span class="icon">🛡️</span> Health
+        </button>
+      </nav>
+
+      <div class="header-status">
+        <div class="status-pill status-ready" id="global-status">
+          <span class="status-dot"></span>
+          <span class="status-text">API Ready</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="app-main">
+    
+    <!-- VIEW 1: Dashboard -->
+    <section id="view-dashboard" class="view-panel active">
+      <div class="view-header">
+        <h2>Platform Overview</h2>
+        <p class="subtitle">Asynchronous Multi-Agent Execution & Cluster Telemetry</p>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">Total Executions</span>
+            <span class="stat-icon">🔄</span>
+          </div>
+          <div class="stat-value" id="stat-total">0</div>
+          <div class="stat-desc">Lifetime submitted tasks</div>
+        </div>
+
+        <div class="stat-card highlight">
+          <div class="stat-header">
+            <span class="stat-title">Active Workers</span>
+            <span class="stat-icon">⚡</span>
+          </div>
+          <div class="stat-value" id="stat-active">2</div>
+          <div class="stat-desc">Celery task runners online</div>
+        </div>
+
+        <div class="stat-card success">
+          <div class="stat-header">
+            <span class="stat-title">Success Rate</span>
+            <span class="stat-icon">✅</span>
+          </div>
+          <div class="stat-value" id="stat-success-rate">100%</div>
+          <div class="stat-desc">Completed vs Failed jobs</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-title">System Status</span>
+            <span class="stat-icon">🌐</span>
+          </div>
+          <div class="stat-value text-green" id="stat-system-status">Healthy</div>
+          <div class="stat-desc">Redis & API connected</div>
+        </div>
+      </div>
+
+      <!-- Quick Action & Recent List Grid -->
+      <div class="dashboard-grid">
+        <!-- Quick Task Submission Card -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <h3>⚡ Quick Run Agent</h3>
+          </div>
+          <div class="card-body">
+            <form id="quick-run-form">
+              <div class="form-group">
+                <label for="quick-task-input">Agent Task Prompt</label>
+                <textarea id="quick-task-input" placeholder="e.g. Analyze Kubernetes cluster security policy and summarize potential risks..." rows="4" required></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">
+                <span>Submit Task to Queue</span>
+                <span class="spinner hidden" id="quick-spinner"></span>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Recent Executions List -->
+        <div class="card glass-card">
+          <div class="card-header flex-between">
+            <h3>📜 Recent Executions</h3>
+            <button class="btn btn-sm btn-ghost" id="refresh-recent-btn">🔄 Refresh</button>
+          </div>
+          <div class="card-body">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Execution ID</th>
+                    <th>Status</th>
+                    <th>Task</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-executions-tbody">
+                  <tr class="empty-row">
+                    <td colspan="4">No tasks submitted yet. Submit a task to begin!</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: Run Agent -->
+    <section id="view-run-agent" class="view-panel">
+      <div class="view-header">
+        <h2>Submit Agent Task</h2>
+        <p class="subtitle">Enqueue asynchronous multi-agent planning and execution job</p>
+      </div>
+
+      <div class="card glass-card form-card">
+        <form id="full-run-form">
+          <div class="form-group">
+            <label for="full-task-input">AI Task Instructions</label>
+            <textarea id="full-task-input" placeholder="Provide detailed instructions for the multi-agent execution engine..." rows="5" required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="full-context-input">Context Parameters (JSON Optional)</label>
+            <textarea id="full-context-input" class="code-input" rows="3" placeholder='{"environment": "production", "priority": "high"}'></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg" id="submit-agent-btn">
+              <span>🚀 Launch Agent Execution</span>
+              <span class="spinner hidden" id="full-spinner"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- VIEW 3: Execution Details -->
+    <section id="view-execution-details" class="view-panel">
+      <div class="view-header flex-between">
+        <div>
+          <button class="btn btn-sm btn-ghost mb-2" id="back-to-executions-btn">← Back to History</button>
+          <h2 id="detail-execution-id">Execution Details</h2>
+        </div>
+        <div id="detail-status-pill" class="badge badge-queued">QUEUED</div>
+      </div>
+
+      <div class="details-grid">
+        <!-- Metadata Sidebar -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <h3>Execution Metadata</h3>
+          </div>
+          <div class="card-body">
+            <div class="meta-list">
+              <div class="meta-item">
+                <span class="meta-label">Execution ID:</span>
+                <span class="meta-value code-font" id="detail-id-val">-</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Status:</span>
+                <span class="meta-value" id="detail-status-val">-</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Steps Completed:</span>
+                <span class="meta-value" id="detail-steps-val">0</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Retries:</span>
+                <span class="meta-value" id="detail-retries-val">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Task & Output Main View -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <h3>Task Prompt</h3>
+          </div>
+          <div class="card-body">
+            <div class="prompt-box" id="detail-task-prompt">Loading task prompt...</div>
+          </div>
+
+          <div class="card-header mt-4">
+            <h3>Agent Output & Results</h3>
+          </div>
+          <div class="card-body">
+            <div class="result-box" id="detail-result-box">
+              <span class="placeholder-text">Task is queued or running in worker...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Correlated Log Section -->
+      <div class="card glass-card mt-4">
+        <div class="card-header flex-between">
+          <h3>🪵 Correlated Execution Logs (execution_id)</h3>
+          <span class="tag tag-blue">JSON Telemetry</span>
+        </div>
+        <div class="card-body">
+          <pre class="log-terminal" id="detail-logs-terminal">Initializing log stream for execution...</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: Executions History -->
+    <section id="view-executions" class="view-panel">
+      <div class="view-header flex-between">
+        <div>
+          <h2>Execution History</h2>
+          <p class="subtitle">Complete audit trail of submitted agent execution tasks</p>
+        </div>
+        <div class="filter-controls">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="queued">Queued</button>
+          <button class="filter-btn" data-filter="running">Running</button>
+          <button class="filter-btn" data-filter="completed">Completed</button>
+          <button class="filter-btn" data-filter="failed">Failed</button>
+        </div>
+      </div>
+
+      <div class="card glass-card">
+        <div class="card-body">
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Execution ID</th>
+                  <th>Status</th>
+                  <th>Task Prompt</th>
+                  <th>Steps</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="history-executions-tbody">
+                <tr class="empty-row">
+                  <td colspan="5">Loading execution history...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 5: Platform Health -->
+    <section id="view-health" class="view-panel">
+      <div class="view-header">
+        <h2>Platform Health & Operational Telemetry</h2>
+        <p class="subtitle">Infrastructure Readiness and Microservice Status</p>
+      </div>
+
+      <div class="health-grid">
+        <div class="health-card glass-card">
+          <div class="health-header">
+            <div class="health-icon">🌐</div>
+            <div class="health-info">
+              <h3>FastAPI Application</h3>
+              <p>HTTP Endpoint Server</p>
+            </div>
+            <span class="badge badge-success" id="health-api-badge">HEALTHY</span>
+          </div>
+          <div class="health-body">
+            <div class="health-stat">Endpoint: <code>/health</code></div>
+            <div class="health-stat">Status Code: 200 OK</div>
+          </div>
+        </div>
+
+        <div class="health-card glass-card">
+          <div class="health-header">
+            <div class="health-icon">💾</div>
+            <div class="health-info">
+              <h3>Redis Storage & Broker</h3>
+              <p>In-Memory Queue & Persistence</p>
+            </div>
+            <span class="badge badge-success" id="health-redis-badge">READY</span>
+          </div>
+          <div class="health-body">
+            <div class="health-stat">Endpoint: <code>/ready</code></div>
+            <div class="health-stat">Network Policy: Restricted</div>
+          </div>
+        </div>
+
+        <div class="health-card glass-card">
+          <div class="health-header">
+            <div class="health-icon">⚡</div>
+            <div class="health-info">
+              <h3>Celery Workers</h3>
+              <p>Asynchronous Execution Nodes</p>
+            </div>
+            <span class="badge badge-success" id="health-worker-badge">ONLINE</span>
+          </div>
+          <div class="health-body">
+            <div class="health-stat">Autoscaler (HPA): Active</div>
+            <div class="health-stat">Disruption Budget (PDB): Min 1</div>
+          </div>
+        </div>
+
+        <div class="health-card glass-card">
+          <div class="health-header">
+            <div class="health-icon">📊</div>
+            <div class="health-info">
+              <h3>Observability Layer</h3>
+              <p>Prometheus & Grafana Telemetry</p>
+            </div>
+            <span class="badge badge-success">ACTIVE</span>
+          </div>
+          <div class="health-body">
+            <div class="health-stat">Scrape Path: <code>/metrics</code></div>
+            <div class="health-stat">Structured Logs: Active</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <p>AgentKube AI Platform — Enterprise Kubernetes Multi-Agent Orchestration</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

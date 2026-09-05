@@ -1,0 +1,57 @@
+{{- if .Values.ui.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-ui
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: agent-platform
+    app.kubernetes.io/component: ui
+spec:
+  replicas: {{ .Values.ui.replicaCount }}
+  selector:
+    matchLabels:
+      app: agent-ui
+  template:
+    metadata:
+      labels:
+        app: agent-ui
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.apiName }}
+      securityContext:
+        runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.podSecurityContext.runAsUser }}
+        runAsGroup: {{ .Values.podSecurityContext.runAsGroup }}
+        fsGroup: {{ .Values.podSecurityContext.fsGroup }}
+      containers:
+        - name: agent-ui
+          image: "{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag }}"
+          imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
+          ports:
+            - containerPort: 80
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: {{ .Values.ui.resources.requests.cpu }}
+              memory: {{ .Values.ui.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.ui.resources.limits.cpu }}
+              memory: {{ .Values.ui.resources.limits.memory }}
+{{- end }}
