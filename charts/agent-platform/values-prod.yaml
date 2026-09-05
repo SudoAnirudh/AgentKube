@@ -1,7 +1,8 @@
-# Production Environment Configuration Overrides
+# Production Environment Configuration Overrides — Hardened & Resilient
 
 api:
   replicaCount: 3
+  terminationGracePeriodSeconds: 30
   resources:
     requests:
       cpu: 250m
@@ -9,9 +10,19 @@ api:
     limits:
       cpu: 1000m
       memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  pdb:
+    enabled: true
+    minAvailable: 2
 
 worker:
   replicaCount: 2
+  terminationGracePeriodSeconds: 60
   resources:
     requests:
       cpu: 250m
@@ -19,6 +30,27 @@ worker:
     limits:
       cpu: 1000m
       memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 75
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+redis:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+networkPolicy:
+  enabled: true
+  allowExternalIngress: true
 
 config:
   environment: production

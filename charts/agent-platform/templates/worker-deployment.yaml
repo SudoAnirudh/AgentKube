@@ -16,10 +16,32 @@ spec:
       labels:
         app: agent-worker
     spec:
+      serviceAccountName: {{ .Values.serviceAccount.workerName }}
+      terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds | default 60 }}
+      securityContext:
+        runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.podSecurityContext.runAsUser }}
+        runAsGroup: {{ .Values.podSecurityContext.runAsGroup }}
+        fsGroup: {{ .Values.podSecurityContext.fsGroup }}
+      {{- if .Values.worker.topologySpreadConstraints.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ .Values.worker.topologySpreadConstraints.maxSkew }}
+          topologyKey: {{ .Values.worker.topologySpreadConstraints.topologyKey }}
+          whenUnsatisfiable: {{ .Values.worker.topologySpreadConstraints.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              app: agent-worker
+      {{- end }}
       containers:
         - name: agent-worker
           image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
           imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            capabilities:
+              drop:
+                - ALL
           command:
             {{- toYaml .Values.worker.command | nindent 12 }}
           envFrom:
@@ -31,6 +53,9 @@ spec:
                 secretKeyRef:
                   name: agent-secret
                   key: LLM_API_KEY
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
           livenessProbe:
             exec:
               command:
@@ -50,3 +75,6 @@ spec:
             limits:
               cpu: {{ .Values.worker.resources.limits.cpu }}
               memory: {{ .Values.worker.resources.limits.memory }}
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}

@@ -1,119 +1,96 @@
-# Kubernetes Multi-Agent AI Execution Platform (Phase 8)
+# Kubernetes Multi-Agent AI Execution Platform (Phase 9)
 
-Asynchronous job-based multi-agent execution platform containerized with **Docker**, orchestrated using **Kubernetes** (`kind` / `kubectl`), packaged with **Helm** (v3.17+), provisioned with **Terraform IaC** for Cloud Kubernetes (AWS EKS), automated with **GitHub Actions CI/CD** and **Argo CD GitOps**, and monitored with **Prometheus, Grafana, Alertmanager & Structured Telemetry**. Demonstrates production observability: **Application & HTTP Metrics (`GET /metrics`), JSON Structured Logging with `execution_id` Correlation IDs, Prometheus Scraping, Alertmanager PromQL Threshold Rules, Grafana Operational Dashboards, and K8s State Monitoring**.
+Asynchronous job-based multi-agent execution platform containerized with **Docker**, orchestrated using **Kubernetes** (`kind` / `kubectl`), packaged with **Helm** (v3.17+), provisioned with **Terraform IaC** for Cloud Kubernetes (AWS EKS), automated with **GitHub Actions CI/CD** and **Argo CD GitOps**, monitored with **Prometheus & Grafana**, and hardened for production with **Resource Management, Horizontal Pod Autoscaling (HPA), PodDisruptionBudgets (PDB), NetworkPolicy Isolation, Non-Root Container SecurityContext, RBAC, and Disaster Recovery**.
 
 ---
 
-## 1. Full Production Telemetry & Observability Architecture
+## 1. Hardened Production Architecture
 
 ```text
-                         Developer / CI/CD
-                                 │
-                                 ▼
-                       AWS EKS (agent-platform)
-                                 │
-        ┌────────────────────────┼────────────────────────┐
-        │                        │                        │
-        ▼                        ▼                        ▼
-    agent-api               Celery Worker             agent-redis
- (HTTP Metrics)            (Task Metrics)           (Broker/State)
-        │                        │                        │
-        └────────────────────────┼────────────────────────┘
-                                 │
-                        Prometheus Scraper
-                          (GET /metrics)
-                                 │
-               ┌─────────────────┴─────────────────┐
-               ▼                                   ▼
-      Grafana Dashboards                  Alertmanager Rules
- ┌───────────────────────────┐           ┌───────────────────────────┐
- │ 1. Platform Overview      │           │ 1. WorkerUnavailable      │
- │ 2. API Performance        │           │ 2. ApiReplicasUnavailable │
- │ 3. Agent Execution        │           │ 3. HighTaskFailureRate    │
- │ 4. K8s Infrastructure     │           │ 4. RedisUnavailable       │
- └───────────────────────────┘           └───────────────────────────┘
+                         Developer / CI/CD / GitOps
+                                     │
+                                     ▼
+                           AWS EKS (agent-platform)
+                                     │
+            ┌────────────────────────┼────────────────────────┐
+            │                        │                        │
+            ▼                        ▼                        ▼
+        agent-api               Celery Worker             agent-redis
+    (HPA: 3 → 8 Pods)        (HPA: 2 → 8 Pods)       (Isolated Port 6379)
+  [ PDB: minAvailable 2 ]  [ PDB: minAvailable 1 ]  [ NetworkPolicy Gated ]
+  [ Non-Root / ReadOnly ]  [ Non-Root / ReadOnly ]  [ Non-Root / ReadOnly ]
+            │                        │                        │
+            └────────────────────────┼────────────────────────┘
+                                     │
+                            Prometheus Scraper
+                              (GET /metrics)
+                                     │
+                   ┌─────────────────┴─────────────────┐
+                   ▼                                   ▼
+          Grafana Dashboards                  Alertmanager Rules
 ```
 
 ---
 
-## 2. Helm, Terraform, GitOps & Observability Project Structure
+## 2. Hardening & Security Features
+
+- **Resource Limits & QoS**: CPU requests/limits (`250m` / `1000m`) & Memory requests/limits (`256Mi` / `1Gi`) preventing OOMKilled host node panics.
+- **Horizontal Pod Autoscaling (HPA)**: Dynamic scaling using `autoscaling/v2` based on CPU (70%) and Memory (80%) thresholds.
+- **PodDisruptionBudget (PDB)**: Guaranteed availability during node drains or voluntary cluster maintenance.
+- **NetworkPolicy Isolation**: Strict L3/L4 container isolation blocking unauthenticated external ingress into Redis.
+- **SecurityContext & Least-Privilege RBAC**: Container execution as Non-Root UID `1000`, `readOnlyRootFilesystem: true` with `/tmp` `emptyDir` volume mounts, dropped kernel capabilities (`ALL`), and dedicated ServiceAccounts.
+- **Disaster Recovery Playbook**: Documented RTO (<15 min) and RPO (<5 min) operational recovery playbooks in `docs/disaster-recovery.md`.
+
+---
+
+## 3. Project Structure
 
 ```text
 .
 ├── .github/
-│   └── workflows/
-│       ├── ci.yaml             # CI pipeline: Pytest, Helm lint, Helm template
-│       └── build.yaml          # Build pipeline: AWS OIDC, Docker build, Trivy scan, ECR push
-├── argocd/
-│   ├── project.yaml            # Argo CD AppProject definition
-│   ├── application-dev.yaml    # Argo CD Application (Dev environment sync)
-│   ├── application-prod.yaml   # Argo CD Application (Prod environment sync)
-│   └── application-observability.yaml # Argo CD Application (Monitoring stack sync)
-├── observability/
-│   ├── prometheus/
-│   │   └── prometheus.yaml     # Prometheus scrape configuration
-│   ├── alertmanager/
-│   │   └── rules.yaml          # Alertmanager alert rules (PromQL)
-│   └── dashboards/
-│       ├── platform-overview.json  # Grafana Platform Overview dashboard
-│       ├── api-performance.json    # Grafana API Performance dashboard
-│       ├── agent-execution.json    # Grafana Agent Execution dashboard
-│       └── k8s-infrastructure.json # Grafana K8s Infrastructure dashboard
-├── terraform/                  # Infrastructure as Code (AWS EKS)
+│   └── workflows/             # GitHub Actions CI/CD & Security Scan
+├── argocd/                     # Argo CD GitOps Application Manifests
 ├── charts/
 │   └── agent-platform/        # Parameterized Helm Chart
-└── docs/learning/
-    ├── task-06-cloud-kubernetes-infrastructure.md # Task 06 Learning Document
-    ├── task-07-cicd-gitops-agent-delivery.md      # Task 07 Learning Document
-    └── task-08-observability-monitoring.md        # Task 08 Learning Document
+│       ├── templates/
+│       │   ├── api-hpa.yaml       # API HorizontalPodAutoscaler
+│       │   ├── worker-hpa.yaml    # Worker HorizontalPodAutoscaler
+│       │   ├── api-pdb.yaml       # API PodDisruptionBudget
+│       │   ├── worker-pdb.yaml    # Worker PodDisruptionBudget
+│       │   ├── network-policy.yaml# NetworkPolicy rules
+│       │   └── serviceaccount.yaml# Dedicated RBAC ServiceAccounts
+│       ├── values.yaml        # Default values
+│       └── values-prod.yaml   # Hardened production overrides
+├── observability/             # Prometheus, Alertmanager, Grafana Dashboards
+├── scripts/
+│   └── run_failure_simulations.sh # Controlled failure simulation script
+├── tests/
+│   └── reliability/           # Reliability & resilience test suite
+└── docs/
+    ├── production-hardening.md # Hardening & QoS documentation
+    ├── disaster-recovery.md   # Disaster recovery playbook
+    └── learning/              # Task learning markdown documents
 ```
 
 ---
 
-## 3. Quickstart: Metrics, Dashboards & Alerting
+## 4. Quickstart & Verification
 
-### Prerequisites
-- Docker Engine (v20.10+)
-- `kind` (v0.27.0+)
-- `kubectl` (v1.37.0+)
-- `helm` (v3.17.1+)
-
-### Step 1: Run Pytest Test Suite (28 Passed)
+### Step 1: Run Pytest Test Suite (32 Passed)
 ```bash
 ./.venv/bin/pytest -v
 ```
 
-### Step 2: Test Local Prometheus Metrics Endpoint
+### Step 2: Lint and Render Hardened Helm Chart
 ```bash
-curl -s http://localhost:8000/metrics | grep agent_
+helm lint ./charts/agent-platform
+helm template agentkube ./charts/agent-platform -f ./charts/agent-platform/values-prod.yaml
 ```
 
-### Step 3: Simulate Worker Outage & Alertmanager Firing
+### Step 3: Run Controlled Reliability & Failure Simulations
 ```bash
-# 1. Scale Celery worker to 0 replicas
-kubectl scale deploy/agent-worker --replicas=0 -n agent-platform
-
-# 2. Submit agent task to queue
-curl -X POST http://localhost:8000/api/v1/agent/run -H "Content-Type: application/json" -d '{"task":"test"}'
-
-# 3. Observe Prometheus & Alertmanager firing WorkerUnavailable alert!
-
-# 4. Restore Celery worker to 2 replicas
-kubectl scale deploy/agent-worker --replicas=2 -n agent-platform
+DRY_RUN=true ./scripts/run_failure_simulations.sh
 ```
-
----
-
-## 4. Operational Telemetry Command Summary
-
-| Action | Command |
-| --- | --- |
-| **Scrape Prometheus Metrics** | `curl -s http://localhost:8000/metrics` |
-| **Run Pytest Suite** | `./.venv/bin/pytest` |
-| **Lint Helm Chart** | `helm lint ./charts/agent-platform` |
-| **Apply Observability GitOps Manifests** | `kubectl apply -f argocd/application-observability.yaml` |
-| **Simulate Worker Outage** | `kubectl scale deploy/agent-worker --replicas=0 -n agent-platform` |
-| **Restore Worker** | `kubectl scale deploy/agent-worker --replicas=2 -n agent-platform` |
 
 ---
 
@@ -133,16 +110,6 @@ kubectl scale deploy/agent-worker --replicas=2 -n agent-platform
 
 ---
 
-## 6. Running Automated Tests
+## 6. Phase Status
 
-```bash
-# Run 28/28 Pytest test suite
-./.venv/bin/pytest -v
-```
-
----
-
-## 7. Roadmap & Next Phase
-
-- **Phase 8 (Completed)**: Observability, Monitoring & Production Telemetry (Prometheus Metrics, JSON Structured Logging, Grafana Dashboards, Alertmanager Rules).
-- **Phase 9 (Next)**: Autoscaling, Performance Optimization & Production Reliability (Horizontal Pod Autoscalers, Load Testing, SLA/SLO Enforcement).
+- **Phase 9 (Completed)**: Production Hardening & Reliability (Resource Requests/Limits, HPA, PDB, NetworkPolicies, Non-Root Container SecurityContext, RBAC, Disaster Recovery).

@@ -1,0 +1,97 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-api-network-policy
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: agent-platform
+    app.kubernetes.io/component: api
+spec:
+  podSelector:
+    matchLabels:
+      app: agent-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.api.service.port }}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: agent-redis
+      ports:
+        - protocol: TCP
+          port: {{ .Values.redis.service.port }}
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-worker-network-policy
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: agent-platform
+    app.kubernetes.io/component: worker
+spec:
+  podSelector:
+    matchLabels:
+      app: agent-worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: agent-redis
+      ports:
+        - protocol: TCP
+          port: {{ .Values.redis.service.port }}
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-redis-network-policy
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: agent-platform
+    app.kubernetes.io/component: redis
+spec:
+  podSelector:
+    matchLabels:
+      app: agent-redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: agent-api
+        - podSelector:
+            matchLabels:
+              app: agent-worker
+      ports:
+        - protocol: TCP
+          port: {{ .Values.redis.service.port }}
+{{- end }}

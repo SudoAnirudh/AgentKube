@@ -16,10 +16,32 @@ spec:
       labels:
         app: agent-api
     spec:
+      serviceAccountName: {{ .Values.serviceAccount.apiName }}
+      terminationGracePeriodSeconds: {{ .Values.api.terminationGracePeriodSeconds | default 30 }}
+      securityContext:
+        runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.podSecurityContext.runAsUser }}
+        runAsGroup: {{ .Values.podSecurityContext.runAsGroup }}
+        fsGroup: {{ .Values.podSecurityContext.fsGroup }}
+      {{- if .Values.api.topologySpreadConstraints.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ .Values.api.topologySpreadConstraints.maxSkew }}
+          topologyKey: {{ .Values.api.topologySpreadConstraints.topologyKey }}
+          whenUnsatisfiable: {{ .Values.api.topologySpreadConstraints.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              app: agent-api
+      {{- end }}
       containers:
         - name: agent-api
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: {{ .Values.api.service.port }}
           envFrom:
@@ -31,6 +53,9 @@ spec:
                 secretKeyRef:
                   name: agent-secret
                   key: LLM_API_KEY
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: {{ .Values.api.probes.liveness.path }}
@@ -50,3 +75,6 @@ spec:
             limits:
               cpu: {{ .Values.api.resources.limits.cpu }}
               memory: {{ .Values.api.resources.limits.memory }}
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}

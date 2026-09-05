@@ -16,10 +16,23 @@ spec:
       labels:
         app: agent-redis
     spec:
+      serviceAccountName: {{ .Values.serviceAccount.redisName }}
+      terminationGracePeriodSeconds: {{ .Values.redis.terminationGracePeriodSeconds | default 30 }}
+      securityContext:
+        runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.podSecurityContext.runAsUser }}
+        runAsGroup: {{ .Values.podSecurityContext.runAsGroup }}
+        fsGroup: {{ .Values.podSecurityContext.fsGroup }}
       containers:
         - name: agent-redis
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
           imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: {{ .Values.redis.securityContext.allowPrivilegeEscalation }}
+            readOnlyRootFilesystem: {{ .Values.redis.securityContext.readOnlyRootFilesystem }}
+            capabilities:
+              drop:
+                {{- toYaml .Values.redis.securityContext.capabilities.drop | nindent 16 }}
           ports:
             - containerPort: {{ .Values.redis.service.port }}
           livenessProbe:
@@ -43,3 +56,9 @@ spec:
             limits:
               cpu: {{ .Values.redis.resources.limits.cpu }}
               memory: {{ .Values.redis.resources.limits.memory }}
+          volumeMounts:
+            - name: data-volume
+              mountPath: /data
+      volumes:
+        - name: data-volume
+          emptyDir: {}
