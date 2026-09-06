@@ -199,11 +199,3 @@ helm template agentkube charts/agent-platform -f charts/agent-platform/values-pr
 | **Disaster Recovery RPO** | $< 5\text{ minutes}$ (Redis AOF state restoration) |
 
 ---
-
-## 9. Recruiter-Ready Resume Bullet Points
-
-- **Kubernetes & Cloud Infrastructure**: Architected an enterprise asynchronous multi-agent AI execution platform on AWS EKS using Terraform IaC, containerizing backend services with multi-stage Docker builds and packaging manifests with Helm v3.
-- **GitOps & CI/CD Pipelines**: Designed an automated GitOps delivery pipeline with GitHub Actions and Argo CD, featuring AWS OIDC authentication, Trivy container security scanning, and automated production reconciliation.
-- **Observability & Telemetry**: Implemented full-stack observability with Prometheus metric exporters (`GET /metrics`), JSON structured logging with `execution_id` correlation IDs across distributed workers, Alertmanager rules, and 4 operational Grafana dashboards.
-- **Production Hardening & Reliability**: Hardened Kubernetes workloads using `autoscaling/v2` HPAs, `policy/v1` PDBs, L3/L4 NetworkPolicies isolating Redis storage, least-privilege RBAC ServiceAccounts, and non-root container security contexts with read-only root filesystems.
-- **Full-Stack Web Product**: Developed a responsive dark-themed Web Application (Nginx + JS) providing real-time status polling, task execution details, correlated log terminal views, and platform health monitoring.
